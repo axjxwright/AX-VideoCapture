@@ -42,6 +42,11 @@ namespace AX
             return Impl::GetDevices ( refresh );
         }
 
+        std::vector<Capture::DeviceProfile> Capture::GetProfiles ( const DeviceDescriptor& descriptor )
+        {
+            return Impl::GetProfiles ( descriptor );
+        }
+
         signals::Signal<void ( AX::Video::Capture::DeviceDescriptor )>& Capture::OnDeviceAdded ( )
         {
             static signals::Signal<void ( AX::Video::Capture::DeviceDescriptor )> kSignal;

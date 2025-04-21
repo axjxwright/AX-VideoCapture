@@ -24,12 +24,13 @@
 #include "cinder/audio/Device.h"
 #include <string>
 #include <unordered_map>
+#include <set>
 #include <mutex>
 #include <condition_variable>
 
 #include <mfapi.h>
 #include <mferror.h>
-#include <mfmediaengine.h>
+#include <mfreadwrite.h>
 #include <mfidl.h>
 #include <d3d11.h>
 #include <dxgi.h>
@@ -553,6 +554,7 @@ namespace AX::Video
 {
     static Lib kCaptureLib{ "MFCaptureEngine.dll" };
 
+    ComPtr<IMFMediaSource> FindDeviceSource ( const Capture::DeviceDescriptor& descriptor );
     static std::vector<Capture::DeviceDescriptor> kCaptureDevices;
     std::vector<Capture::DeviceDescriptor> Capture::Impl::GetDevices ( bool refresh )
     {
@@ -591,6 +593,64 @@ namespace AX::Video
         }
 
         return kCaptureDevices;
+    }
+
+    std::vector<Capture::DeviceProfile> Capture::Impl::GetProfiles ( const DeviceDescriptor& descriptor )
+    {
+        std::set<Capture::DeviceProfile> unique;
+        
+        if ( auto source = FindDeviceSource ( descriptor ) )
+        {
+            ComPtr<IMFSourceReader> reader;
+            if ( CheckSucceeded ( MFCreateSourceReaderFromMediaSource ( source.Get ( ), nullptr, &reader ) ) )
+            {
+                bool done = false;
+                HRESULT hr = S_OK;
+                DWORD index = 0;
+
+                while ( SUCCEEDED ( hr ) )
+                {
+                    if ( done ) break;
+                    ComPtr<IMFMediaType> type = nullptr;
+
+                    switch ( reader->GetNativeMediaType ( 0, index++, &type ) )
+                    {
+                        case MF_E_NO_MORE_TYPES:
+                        {
+                            hr = S_OK;
+                            done = true;
+                            break;
+                        }
+
+                        case S_OK:
+                        {
+                            UINT32 width, height;
+                            UINT32 fpsNum, fpsDen;
+                            bool size = CheckSucceeded ( MFGetAttributeSize ( type.Get(), MF_MT_FRAME_SIZE, &width, &height ) );
+                            bool fps = CheckSucceeded ( MFGetAttributeRatio ( type.Get(), MF_MT_FRAME_RATE, &fpsNum, &fpsDen ) );
+
+                            if ( size && fps )
+                            {
+                                DeviceProfile profile{};
+                                profile.Size = ivec2 ( width, height );
+                                profile.FPS = ivec2 ( fpsNum, fpsDen );
+                                unique.insert ( profile );
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        std::vector<Capture::DeviceProfile> result{ unique.begin ( ), unique.end ( ) };
+        std::sort ( result.begin ( ), result.end ( ), [=]( const Capture::DeviceProfile& a, const Capture::DeviceProfile& b )
+        {
+            auto aV = a.Size.x * a.Size.y + ( (float)( a.FPS.x ) / (float)( a.FPS.y ) );
+            auto bV = b.Size.x * b.Size.y + ( (float)( b.FPS.x ) / (float)( b.FPS.y ) );
+            return bV < aV;
+        } );
+        return result;
     }
 
     ComPtr<IMFMediaSource> FindDeviceSource ( const Capture::DeviceDescriptor& descriptor )

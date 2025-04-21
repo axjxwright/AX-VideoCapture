@@ -11,10 +11,11 @@
 #include "cinder/gl/gl.h"
 #include "cinder/audio/audio.h"
 #include "AX-VideoCapture.h"
+#include <optional>
 
 #if __has_include( "cinder/CinderImGui.h")
     #include "cinder/CinderImGui.h"
-     #define HAS_DEBUG_UI
+    #define HAS_DEBUG_UI
     namespace ui = ImGui;
 #endif
 
@@ -40,13 +41,17 @@ public:
     void draw ( ) override;
     
 protected:
-    
-    void                            MakeCapture ( const AX::Video::Capture::DeviceDescriptor& device );
 
-    AX::Video::CaptureRef           _capture;
-    bool                            _hardwareAccelerated{ true };
-    gl::TextureRef                  _texture;
-    AX::Video::Capture::Rotation    _rotation{ AX::Video::Capture::Rotation::R0 };
+    using DeviceDescriptor  = AX::Video::Capture::DeviceDescriptor;
+    using DeviceProfile     = AX::Video::Capture::DeviceProfile;
+    
+    void                                MakeCapture ( const DeviceDescriptor& device, std::optional<DeviceProfile> profile = {} );
+
+    AX::Video::CaptureRef               _capture;
+    bool                                _hardwareAccelerated{ true };
+    gl::TextureRef                      _texture;
+    AX::Video::Capture::Rotation        _rotation{ AX::Video::Capture::Rotation::R0 };
+    std::vector<AX::Video::Capture::DeviceProfile> _profiles;
 };
 
 void SimpleCaptureApp::setup ( )
@@ -75,14 +80,18 @@ void SimpleCaptureApp::setup ( )
     
 }
 
-void SimpleCaptureApp::MakeCapture ( const AX::Video::Capture::DeviceDescriptor& device )
+void SimpleCaptureApp::MakeCapture ( const AX::Video::Capture::DeviceDescriptor& device, std::optional<DeviceProfile> profile )
 {
+    if ( !profile ) _profiles = AX::Video::Capture::GetProfiles ( device );
+
     AX::Video::Capture::Format fmt;
     fmt.HardwareAccelerated ( _hardwareAccelerated )
        .Size ( { 1280, 720 } )
        .FPS ( 60 )
        .RotationAngle ( _rotation )
        .Device ( device );
+
+    if ( profile ) fmt.Profile ( *profile );
 
     _capture = AX::Video::Capture::Create ( fmt );
     _capture->OnStart.connect ( [] { std::cout << "Device started.\n"; } );
@@ -159,7 +168,11 @@ void SimpleCaptureApp::draw ( )
         ScopedWindow2 window{ "Settings", ImGuiWindowFlags_AlwaysAutoResize };
         if ( ui::Checkbox ( "Hardware Accelerated", &_hardwareAccelerated ) )
         {
-            if ( _capture ) MakeCapture ( _capture->GetDevice ( ) );
+            if ( _capture )
+            {
+                std::optional<DeviceProfile> profile = DeviceProfile{ _capture->GetSize ( ), _capture->GetFormat ( ).FPS ( ) };
+                MakeCapture ( _capture->GetDevice ( ), profile );
+            }
         }
 
         std::string prompt = _capture ? _capture->GetDevice ( ).Name : "<No device>";
@@ -169,7 +182,10 @@ void SimpleCaptureApp::draw ( )
             {
                 if ( ui::Selectable ( device.Name.c_str ( ) ) )
                 {
-                    MakeCapture ( device );
+                    std::optional<DeviceProfile> profile;
+                    if ( _capture && _capture->GetDevice() == device ) profile = DeviceProfile{ _capture->GetSize ( ), _capture->GetFormat ( ).FPS ( ) };
+
+                    MakeCapture ( device, profile );
                 }
             }
             ui::EndCombo ( );
@@ -177,7 +193,21 @@ void SimpleCaptureApp::draw ( )
 
         if ( _capture )
         {
-            ui::Text ( "Device: %s (%dx%d@%d) %s", _capture->GetDevice ( ).Name.c_str ( ), _capture->GetSize ( ).x, _capture->GetSize ( ).y, _capture->GetFormat ( ).FPS ( ), _hardwareAccelerated ? "GPU" : "CPU" );
+            AX::Video::Capture::DeviceProfile profile{ _capture->GetSize ( ), _capture->GetFormat ( ).FPS() };
+            if ( ui::BeginCombo ( "Profile", profile.Key().c_str() ) )
+            {
+                for ( auto& profile : _profiles )
+                {
+                    if ( ui::Selectable ( profile.Key ( ).c_str ( ) ) )
+                    {
+                        MakeCapture ( _capture->GetDevice ( ), profile );
+                    }
+                }
+                ui::EndCombo ( );
+            }
+
+            float fps = (float)_capture->GetFormat ( ).FPS ( ).x / (float)_capture->GetFormat ( ).FPS ( ).y;
+            ui::Text ( "Device: %s (%dx%d@%g) %s", _capture->GetDevice ( ).Name.c_str ( ), _capture->GetSize ( ).x, _capture->GetSize ( ).y, fps, _hardwareAccelerated ? "GPU" : "CPU" );
             ui::SameLine ( );
             if ( _capture->IsStarted ( ) ) if ( ui::SmallButton ( "Stop" ) ) _capture->Stop ( );
             if ( _capture->IsStopped ( ) ) if ( ui::SmallButton ( "Start" ) ) _capture->Start ( );

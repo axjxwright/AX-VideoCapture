@@ -56,6 +56,7 @@ namespace AX::Video
         Impl    ( Capture & owner, const Format& format );
 
         static std::vector<Capture::DeviceDescriptor> GetDevices ( bool refresh );
+        static std::vector<Capture::DeviceProfile>    GetProfiles ( const DeviceDescriptor& descriptor );
         
         const   ci::ivec2 &         GetSize ( ) const { return _format.Size(); }
         bool                        CheckNewFrame ( ) const { return _hasNewFrame.load ( ); }

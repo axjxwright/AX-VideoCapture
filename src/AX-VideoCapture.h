@@ -39,10 +39,35 @@ namespace AX::Video
             virtual bool IsValid ( ) const { return false; };
         };
 
+        struct DeviceProfile
+        {
+            ci::ivec2 Size;
+            ci::ivec2 FPS;
+
+            bool operator == ( const DeviceProfile& other ) const
+            {
+                return Size == other.Size && FPS == other.FPS;
+            }
+
+            bool operator < ( const DeviceProfile& other ) const
+            {
+                return Key ( ) < other.Key ( );
+            }
+
+            std::string Key ( ) const
+            {
+                char buffer[32] = {};
+                float fps = ( (float)( FPS.x ) / (float)( FPS.y ) );
+                std::snprintf ( buffer, sizeof(buffer), "%dx%d@%g", Size.x, Size.y, fps );
+                return buffer;
+            }
+        };
+
         struct DeviceDescriptor
         {
             std::string Name;
             std::string ID;
+            std::vector<DeviceProfile> Profiles;
 
             bool operator == ( const DeviceDescriptor& other ) const
             {
@@ -77,7 +102,7 @@ namespace AX::Video
             int32_t&            Value ( ) { return _value; }
             void                Value ( int32_t value ) { StoreValue ( value ); }
 
-            virtual ~Control ( ) {};
+            virtual             ~Control ( ) {};
 
         protected:
 
@@ -106,6 +131,7 @@ namespace AX::Video
             Format& HardwareAccelerated ( bool accelerated ) { _hardwareAccelerated = accelerated; return *this; }
             Format& RotationAngle ( Rotation rotation ) { _rotation = rotation; return *this; }
             Format& AutoStart ( bool autoStart ) { _autoStart = autoStart; return *this; }
+            Format& Profile ( const DeviceProfile& profile ) { Size ( profile.Size ); FPS ( profile.FPS.x, profile.FPS.y ); return *this; }
 
             const ci::ivec2& Size ( ) const { return _size; }
             const ci::ivec2& FPS ( ) const { return _fps; }
@@ -138,30 +164,31 @@ namespace AX::Video
         using  OcclusionChangedSignal = ci::signals::Signal<void ( OcclusionState )>;
 
         static std::vector<DeviceDescriptor> GetDevices ( bool refresh = false );
+        static std::vector<DeviceProfile>    GetProfiles ( const DeviceDescriptor& descriptor );
         static ci::signals::Signal<void ( DeviceDescriptor )>& OnDeviceAdded ( );
         static ci::signals::Signal<void ( DeviceDescriptor )>& OnDeviceRemoved ( );
         
-        static  CaptureRef          Create ( const Format & fmt = Format ( ) );
+        static  CaptureRef              Create ( const Format & fmt = Format ( ) );
         
-        const Format &              GetFormat ( ) const { return _format; }
+        const Format &                  GetFormat ( ) const { return _format; }
 
-        const   ci::ivec2&          GetSize ( ) const;
-        inline  ci::Area            GetBounds ( ) const { return ci::Area ( ci::ivec2(0), GetSize() ); }
-        inline  bool                IsHardwareAccelerated ( ) const { return _format.IsHardwareAccelerated ( ); }
-        bool                        IsValid ( ) const;
+        const   ci::ivec2&              GetSize ( ) const;
+        inline  ci::Area                GetBounds ( ) const { return ci::Area ( ci::ivec2(0), GetSize() ); }
+        inline  bool                    IsHardwareAccelerated ( ) const { return _format.IsHardwareAccelerated ( ); }
+        bool                            IsValid ( ) const;
 
-        bool                        CheckNewFrame ( ) const;
-        const DeviceDescriptor&     GetDevice ( ) const { return _format.Device ( ); }
+        bool                            CheckNewFrame ( ) const;
+        const DeviceDescriptor&         GetDevice ( ) const { return _format.Device ( ); }
 
-        const ci::Surface8uRef &    GetSurface ( ) const;
-        FrameLeaseRef               GetTexture ( ) const;
+        const ci::Surface8uRef &        GetSurface ( ) const;
+        FrameLeaseRef                   GetTexture ( ) const;
 
-        void                        Start ( );
-        void                        Stop ( );
-        bool                        IsStarted ( ) const;
-        bool                        IsStopped ( ) const;
+        void                            Start ( );
+        void                            Stop ( );
+        bool                            IsStarted ( ) const;
+        bool                            IsStopped ( ) const;
 
-        const std::vector<ControlRef>& GetControls ( ) const { return _controls; }
+        const std::vector<ControlRef>&  GetControls ( ) const { return _controls; }
 
         EventSignal                     OnInitialize;
         EventSignal                     OnStart;
