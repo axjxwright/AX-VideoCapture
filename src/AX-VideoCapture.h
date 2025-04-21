@@ -124,9 +124,10 @@ namespace AX::Video
             bool                    _autoStart{ true };
         };
 
-        using   FrameLeaseRef       = std::unique_ptr<FrameLease>;
-        using   EventSignal         = ci::signals::Signal<void ( )>;
-        using   ErrorSignal         = ci::signals::Signal<void ( int )>;
+        using  FrameLeaseRef        = std::unique_ptr<FrameLease>;
+        using  EventSignal          = ci::signals::Signal<void ( )>;
+        using  ErrorSignal          = ci::signals::Signal<void ( int )>;
+        using  ControlChangedSignal = ci::signals::Signal<void ( Control& control )>;
 
         static std::vector<DeviceDescriptor> GetDevices ( bool refresh = false );
         static ci::signals::Signal<void ( DeviceDescriptor )>& OnDeviceAdded ( );
@@ -159,6 +160,7 @@ namespace AX::Video
         EventSignal                     OnStop;
         EventSignal                     OnDeviceLost;
         ErrorSignal                     OnError;
+        ControlChangedSignal            OnControlChanged;
         
         ~Capture ( );
 

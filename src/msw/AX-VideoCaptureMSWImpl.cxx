@@ -195,13 +195,30 @@ namespace AX::Video
 
     struct ControlMSW : public AX::Video::Capture::Control
     {
-        ControlMSW ( const std::string& name, const ComPtr<IKsControl>& control, int key, GUID set = PROPSETID_VIDCAP_VIDEOPROCAMP )
+        ControlMSW ( const std::string& name, const ComPtr<IMFCameraControlMonitor> monitor, const ComPtr<IKsControl>& control, int key, GUID set = PROPSETID_VIDCAP_VIDEOPROCAMP )
             : _control ( control )
             , _set ( set )
             , _key ( key )
+            , _monitor ( monitor )
         {
             _name = name;
+
+            if ( _monitor )
+            {
+                _monitor->AddControlSubscription ( _set, _key );
+            }
         }
+
+        ~ControlMSW ( )
+        {
+            if ( _monitor )
+            {
+                _monitor->RemoveControlSubscription ( _set, _key );
+            }
+        }
+
+        const GUID& Set ( ) const { return _set; }
+        int Key ( ) const { return _key; }
 
         void InitState ( )
         {
@@ -272,9 +289,10 @@ namespace AX::Video
         }
 
     protected:
-        ComPtr<IKsControl>  _control;
-        GUID                _set{ PROPSETID_VIDCAP_VIDEOPROCAMP };
-        int                 _key{ KSPROPERTY_VIDEOPROCAMP_BRIGHTNESS };
+        ComPtr<IKsControl>              _control;
+        GUID                            _set{ PROPSETID_VIDCAP_VIDEOPROCAMP };
+        int                             _key{ KSPROPERTY_VIDEOPROCAMP_BRIGHTNESS };
+        ComPtr<IMFCameraControlMonitor> _monitor;
     };
 
     void SharedTextureDeleter::operator ( ) ( SharedTexture* ptr ) const
@@ -624,6 +642,8 @@ namespace AX::Video
                 ComPtr<IKsControl> control;
                 CheckSucceeded ( source->QueryInterface ( control.GetAddressOf ( ) ) );
 
+                CheckSucceeded ( MFCreateCameraControlMonitor ( msw::toWideString ( _format.Device ( ).ID ).c_str ( ), this, &_monitor ) );
+
                 std::unordered_map<std::string, std::pair<int, GUID>> keys =
                 {
                     { "Brightness", { KSPROPERTY_VIDEOPROCAMP_BRIGHTNESS, PROPSETID_VIDCAP_VIDEOPROCAMP } },
@@ -638,18 +658,19 @@ namespace AX::Video
                     { "Gain", { KSPROPERTY_VIDEOPROCAMP_GAIN, PROPSETID_VIDCAP_VIDEOPROCAMP } },
                     { "Zoom", { KSPROPERTY_CAMERACONTROL_ZOOM, PROPSETID_VIDCAP_CAMERACONTROL } },
                     { "Focus", { KSPROPERTY_CAMERACONTROL_FOCUS, PROPSETID_VIDCAP_CAMERACONTROL } }
-
                 };
 
                 for ( auto& [name, key] : keys )
                 {
-                    auto ctrl = std::make_unique<ControlMSW> ( name, control, key.first, key.second );
+                    auto ctrl = std::make_unique<ControlMSW> ( name, _monitor, control, key.first, key.second );
                     ctrl->InitState ( );
                     if ( ctrl->IsSupported() )
                     {
                         _owner._controls.push_back ( std::move ( ctrl ) );
                     }
                 }
+
+                if ( _monitor ) CheckSucceeded ( _monitor->Start ( ) );
             }
 
             ComPtr<IMFAttributes> attributes;
@@ -846,6 +867,32 @@ namespace AX::Video
         return S_OK;
     }
 
+    void STDMETHODCALLTYPE Capture::Impl::OnChange ( REFGUID controlSet, UINT32 id )
+    {
+        for ( auto& c : _owner._controls )
+        {
+            if ( auto ctrl = dynamic_cast<ControlMSW *> ( c.get() ) )
+            {
+                if ( ctrl->Set ( ) == controlSet && ctrl->Key ( ) == id )
+                {
+                    app::App::get ( )->dispatchAsync ( [=]
+                    {
+                        ctrl->LoadValue ( );
+                        _owner.OnControlChanged.emit ( *ctrl );
+                    } );
+                    
+                    break;
+                }
+            }
+        }
+        
+    }
+
+    void STDMETHODCALLTYPE Capture::Impl::OnError ( HRESULT hrStatus )
+    {
+        CheckSucceeded ( hrStatus );
+    }
+
     HRESULT STDMETHODCALLTYPE Capture::Impl::QueryInterface ( REFIID riid, _COM_Outptr_ void __RPC_FAR* __RPC_FAR* ppvObject )
     {
         if ( riid == __uuidof ( IMFCaptureEngineOnSampleCallback ) )
@@ -877,6 +924,7 @@ namespace AX::Video
     Capture::Impl::~Impl ( )
     {
         _hasNewFrame.store ( false );
+        if ( _monitor ) _monitor->Shutdown ( );
         _captureEngine = nullptr;
         _sharedTextures[0].reset ( );
         _sharedTextures[1].reset ( );

@@ -87,6 +87,10 @@ void SimpleCaptureApp::MakeCapture ( const AX::Video::Capture::DeviceDescriptor&
     _capture = AX::Video::Capture::Create ( fmt );
     _capture->OnStart.connect ( [] { std::cout << "Device started.\n"; } );
     _capture->OnStop.connect ( [] { std::cout << "Device stopped.\n"; } );
+    _capture->OnControlChanged.connect ( []( const AX::Video::Capture::Control& control )
+    {
+        std::printf ( "Device control '%s' is now %d\n", control.Name ( ).c_str ( ), control.Value ( ) );
+    } );
     _capture->OnDeviceLost.connect ( [=] 
     { 
         std::cout << "Device lost.\n"; 

@@ -18,12 +18,13 @@
     #undef WINVER
     #undef NTDDI_VERSION
 #endif
-#define WINVER _WIN32_WINNT_WIN10
-#define NTDDI_VERSION NTDDI_WIN10
+#define WINVER NTDDI_WIN10
+#define NTDDI_VERSION NTDDI_WIN10_NI
 
 #include <wrl/client.h>
 #include <mfapi.h>
 #include <mfcaptureengine.h>
+#include <mfidl.h>
 
 using namespace Microsoft::WRL;
 
@@ -45,7 +46,10 @@ namespace AX::Video
     struct SharedTextureDeleter { void operator() ( SharedTexture* ) const; };
     using  SharedTextureRef = std::unique_ptr<SharedTexture, SharedTextureDeleter>;
 
-    class Capture::Impl : public IMFCaptureEngineOnSampleCallback, public IMFCaptureEngineOnEventCallback
+    class Capture::Impl 
+        : public IMFCaptureEngineOnSampleCallback
+        , public IMFCaptureEngineOnEventCallback
+        , public IMFCameraControlNotify
     {
     public:
         Impl    ( Capture & owner, const Format& format );
@@ -63,9 +67,17 @@ namespace AX::Video
         bool                        IsStopped ( ) const;
         bool                        IsValid ( ) const { return _isValid; }
 
+        // IMFCaptureEngineOnEventCallback
         HRESULT STDMETHODCALLTYPE   OnEvent ( IMFMediaEvent* pEvent ) override;
+
+        // IMFCaptureEngineOnSampleCallback
         HRESULT STDMETHODCALLTYPE   OnSample ( IMFSample* pSample ) override;
 
+        // IMFCameraControlNotify
+        void STDMETHODCALLTYPE      OnChange ( REFGUID controlSet, UINT32 id ) override;
+        void STDMETHODCALLTYPE      OnError ( HRESULT hrStatus ) override;
+
+        // IUnknown
         HRESULT STDMETHODCALLTYPE   QueryInterface ( REFIID riid, _COM_Outptr_ void __RPC_FAR* __RPC_FAR* ppvObject ) override;
         ULONG STDMETHODCALLTYPE     AddRef ( void ) override;
         ULONG STDMETHODCALLTYPE     Release ( void ) override;
@@ -74,18 +86,19 @@ namespace AX::Video
 
     protected:
         
-        Capture &                   _owner;
-        Capture::Format             _format;
-        ComPtr<IMFCaptureEngine>    _captureEngine{ nullptr };
-        mutable std::atomic_bool    _hasNewFrame{ false };
-        bool                        _isValid{ false };
-        std::atomic_bool            _isStarted{ false };
-        std::atomic_bool            _isInitialized{ false };
+        Capture &                       _owner;
+        Capture::Format                 _format;
+        ComPtr<IMFCaptureEngine>        _captureEngine{ nullptr };
+        mutable std::atomic_bool        _hasNewFrame{ false };
+        bool                            _isValid{ false };
+        std::atomic_bool                _isStarted{ false };
+        std::atomic_bool                _isInitialized{ false };
         
-        ci::Surface8uRef            _surfaces[2];
-        SharedTextureRef            _sharedTextures[2];
-        int                         _readIndex{ 0 };
-        int                         _writeIndex{ 1 };
+        ComPtr<IMFCameraControlMonitor> _monitor;
+        ci::Surface8uRef                _surfaces[2];
+        SharedTextureRef                _sharedTextures[2];
+        int                             _readIndex{ 0 };
+        int                             _writeIndex{ 1 };
         
     };
 }
