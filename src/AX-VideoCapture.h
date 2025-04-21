@@ -67,8 +67,7 @@ namespace AX::Video
         {
             std::string Name;
             std::string ID;
-            std::vector<DeviceProfile> Profiles;
-
+            
             bool operator == ( const DeviceDescriptor& other ) const
             {
                 return Name == other.Name && ID == other.ID;
