@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<cinder>
+<block
+	name="AX-VideoCapture"
+	id="au.com.axinteractive.AX-VideoCapture"
+	author="AX Interactive, Andrew Wright"
+	license="MIT"
+	summary="Hardware accelerated and CPU video capture for windows"
+	>
+	<platform os="macosx">
+		<sourcePattern>src/osx/*.mm</sourcePattern>
+		<headerPattern>src/osx/*.h</headerPattern>
+		<includePath>src/osx</includePath>
+	</platform>
+	
+	<platform os="msw">
+		<sourcePattern>src/msw/*.cxx</sourcePattern>
+		<headerPattern>src/msw/*.h</headerPattern>
+		<includePath>src/msw</includePath>
+	</platform>
+	
+	<sourcePattern>src/*.cxx</sourcePattern>
+	<headerPattern>src/*.h</headerPattern>
+	<includePath>src</includePath>
+	
+</block>
+</cinder>
