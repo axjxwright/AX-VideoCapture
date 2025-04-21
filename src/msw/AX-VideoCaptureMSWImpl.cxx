@@ -670,6 +670,14 @@ namespace AX::Video
                 _sharedTextures[0] = ic.CreateSharedTexture ( _format.Size ( ) );
                 _sharedTextures[1] = ic.CreateSharedTexture ( _format.Size ( ) );
 
+                if ( !_sharedTextures[0] || _sharedTextures[1] )
+                {
+                    std::printf ( "Error allocating shared textures\n" );
+                    _isValid = false;
+                    return;
+                }
+
+
                 attributes->SetUnknown ( MF_CAPTURE_ENGINE_D3D_MANAGER, ic.DXGIManager() );
             }
 
@@ -752,7 +760,6 @@ namespace AX::Video
                 if ( _format.AutoStart ( ) )
                 {
                     Start ( );
-                    //CheckSucceeded ( _captureEngine->StartPreview ( ) );
                 }
 
             } else if ( extendedType == MF_CAPTURE_ENGINE_PREVIEW_STARTED )
