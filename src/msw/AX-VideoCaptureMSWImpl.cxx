@@ -640,9 +640,10 @@ namespace AX::Video
         {
             {
                 ComPtr<IKsControl> control;
+                auto symlink = msw::toWideString ( _format.Device ( ).ID );
                 CheckSucceeded ( source->QueryInterface ( control.GetAddressOf ( ) ) );
-
-                CheckSucceeded ( MFCreateCameraControlMonitor ( msw::toWideString ( _format.Device ( ).ID ).c_str ( ), this, &_monitor ) );
+                CheckSucceeded ( MFCreateCameraControlMonitor ( symlink.c_str(), this, &_monitor ) );
+                CheckSucceeded ( MFCreateCameraOcclusionStateMonitor ( symlink.c_str(), this, &_occlusion ) );
 
                 std::unordered_map<std::string, std::pair<int, GUID>> keys =
                 {
@@ -671,6 +672,7 @@ namespace AX::Video
                 }
 
                 if ( _monitor ) CheckSucceeded ( _monitor->Start ( ) );
+                if ( _occlusion ) CheckSucceeded ( _occlusion->Start ( ) );
             }
 
             ComPtr<IMFAttributes> attributes;
@@ -893,6 +895,16 @@ namespace AX::Video
         CheckSucceeded ( hrStatus );
     }
 
+    HRESULT STDMETHODCALLTYPE Capture::Impl::OnOcclusionStateReport ( IMFCameraOcclusionStateReport* occlusionStateReport )
+    {
+        OcclusionState state{ 0 };
+        CheckSucceeded ( occlusionStateReport->GetOcclusionState ( (DWORD *)&state ) );
+ 
+        app::App::get ( )->dispatchAsync ( [=] { _owner.OnOcclusionChanged.emit ( state ); } );
+
+        return S_OK;
+    }
+
     HRESULT STDMETHODCALLTYPE Capture::Impl::QueryInterface ( REFIID riid, _COM_Outptr_ void __RPC_FAR* __RPC_FAR* ppvObject )
     {
         if ( riid == __uuidof ( IMFCaptureEngineOnSampleCallback ) )
@@ -925,6 +937,7 @@ namespace AX::Video
     {
         _hasNewFrame.store ( false );
         if ( _monitor ) _monitor->Shutdown ( );
+        if ( _occlusion ) _occlusion->Stop ( );
         _captureEngine = nullptr;
         _sharedTextures[0].reset ( );
         _sharedTextures[1].reset ( );

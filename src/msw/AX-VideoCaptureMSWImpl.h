@@ -50,6 +50,7 @@ namespace AX::Video
         : public IMFCaptureEngineOnSampleCallback
         , public IMFCaptureEngineOnEventCallback
         , public IMFCameraControlNotify
+        , public IMFCameraOcclusionStateReportCallback
     {
     public:
         Impl    ( Capture & owner, const Format& format );
@@ -77,6 +78,9 @@ namespace AX::Video
         void STDMETHODCALLTYPE      OnChange ( REFGUID controlSet, UINT32 id ) override;
         void STDMETHODCALLTYPE      OnError ( HRESULT hrStatus ) override;
 
+        // IMFCameraOcclusionStateReportCallback
+        HRESULT STDMETHODCALLTYPE   OnOcclusionStateReport ( IMFCameraOcclusionStateReport* occlusionStateReport ) override;
+
         // IUnknown
         HRESULT STDMETHODCALLTYPE   QueryInterface ( REFIID riid, _COM_Outptr_ void __RPC_FAR* __RPC_FAR* ppvObject ) override;
         ULONG STDMETHODCALLTYPE     AddRef ( void ) override;
@@ -86,15 +90,17 @@ namespace AX::Video
 
     protected:
         
+        ComPtr<IMFCaptureEngine>        _captureEngine{ nullptr };
+        ComPtr<IMFCameraControlMonitor> _monitor;
+        ComPtr<IMFCameraOcclusionStateMonitor>  _occlusion;
+
         Capture &                       _owner;
         Capture::Format                 _format;
-        ComPtr<IMFCaptureEngine>        _captureEngine{ nullptr };
         mutable std::atomic_bool        _hasNewFrame{ false };
         bool                            _isValid{ false };
         std::atomic_bool                _isStarted{ false };
         std::atomic_bool                _isInitialized{ false };
         
-        ComPtr<IMFCameraControlMonitor> _monitor;
         ci::Surface8uRef                _surfaces[2];
         SharedTextureRef                _sharedTextures[2];
         int                             _readIndex{ 0 };

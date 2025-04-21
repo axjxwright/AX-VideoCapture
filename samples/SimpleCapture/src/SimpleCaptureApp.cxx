@@ -91,6 +91,29 @@ void SimpleCaptureApp::MakeCapture ( const AX::Video::Capture::DeviceDescriptor&
     {
         std::printf ( "Device control '%s' is now %d\n", control.Name ( ).c_str ( ), control.Value ( ) );
     } );
+    _capture->OnOcclusionChanged.connect ( [=]( AX::Video::Capture::OcclusionState state )
+    {
+        switch ( state )
+        {
+            case AX::Video::Capture::OcclusionState::Open:
+            {
+                std::printf ( "OcclusionState: Open\n" );
+                break;
+            }
+
+            case AX::Video::Capture::OcclusionState::OccludedByLid:
+            {
+                std::printf ( "OcclusionState: OccludedByLid\n" );
+                break;
+            }
+
+            case AX::Video::Capture::OcclusionState::OccludedByHardware:
+            {
+                std::printf ( "OcclusionState: OccludedByHardware\n" );
+                break;
+            }
+        }
+    } );
     _capture->OnDeviceLost.connect ( [=] 
     { 
         std::cout << "Device lost.\n"; 

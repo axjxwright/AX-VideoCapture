@@ -124,10 +124,18 @@ namespace AX::Video
             bool                    _autoStart{ true };
         };
 
+        enum class OcclusionState
+        {
+            Open,
+            OccludedByLid,
+            OccludedByHardware
+        };
+
         using  FrameLeaseRef        = std::unique_ptr<FrameLease>;
         using  EventSignal          = ci::signals::Signal<void ( )>;
         using  ErrorSignal          = ci::signals::Signal<void ( int )>;
         using  ControlChangedSignal = ci::signals::Signal<void ( Control& control )>;
+        using  OcclusionChangedSignal = ci::signals::Signal<void ( OcclusionState )>;
 
         static std::vector<DeviceDescriptor> GetDevices ( bool refresh = false );
         static ci::signals::Signal<void ( DeviceDescriptor )>& OnDeviceAdded ( );
@@ -161,6 +169,7 @@ namespace AX::Video
         EventSignal                     OnDeviceLost;
         ErrorSignal                     OnError;
         ControlChangedSignal            OnControlChanged;
+        OcclusionChangedSignal          OnOcclusionChanged;
         
         ~Capture ( );
 
