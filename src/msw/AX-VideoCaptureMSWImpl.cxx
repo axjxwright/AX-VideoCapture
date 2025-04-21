@@ -363,14 +363,11 @@ namespace
         
         Notifier ( )
         {
-            // @FIXME(andrew): This will get triggered by _any_ USB activity, not just cameras,
-            // and often more than one event per device change, causing lots of spurious 
-            // device re-enumeration. It's fast enough to not worry about but is a bit wasteful.
-
             CM_NOTIFY_FILTER filter{};
             filter.cbSize = sizeof ( filter );
             filter.FilterType = CM_NOTIFY_FILTER_TYPE_DEVICEINTERFACE;
-            filter.Flags = CM_NOTIFY_FILTER_FLAG_ALL_INTERFACE_CLASSES;
+            filter.Flags = 0;
+            filter.u.DeviceInterface.ClassGuid = KSCATEGORY_CAPTURE;
             CM_Register_Notification ( &filter, this, OnDeviceNotify, &handle );
         }
 
