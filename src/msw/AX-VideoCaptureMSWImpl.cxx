@@ -670,7 +670,7 @@ namespace AX::Video
                 _sharedTextures[0] = ic.CreateSharedTexture ( _format.Size ( ) );
                 _sharedTextures[1] = ic.CreateSharedTexture ( _format.Size ( ) );
 
-                if ( !_sharedTextures[0] || _sharedTextures[1] )
+                if ( !_sharedTextures[0] || !_sharedTextures[1] )
                 {
                     std::printf ( "Error allocating shared textures\n" );
                     _isValid = false;
